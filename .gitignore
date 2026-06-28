@@ -1,0 +1,34 @@
+# Built artifacts
+**/build/
+*.apk
+*.aar
+*.aab
+
+# Gradle files
+.gradle/
+local.properties
+/captures/
+
+# IDEs/Editors
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Key files
+*.jks
+*.keystore
+
+# Python & Environment
+venv/
+.env
+__pycache__/
+*.pyc
+
+# Local log files
+*.log
