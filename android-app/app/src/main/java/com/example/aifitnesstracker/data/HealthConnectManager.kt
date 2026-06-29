@@ -75,9 +75,10 @@ class HealthConnectManager(private val context: Context) {
                     timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
                 )
             )
-            response.records.flatMap { record ->
-                record.samples.map { it.beatsPerMinute.toInt() }
-            }
+            response.records
+                .flatMap { record -> record.samples }
+                .sortedBy { it.time }
+                .map { it.beatsPerMinute.toInt() }
         } catch (e: Exception) {
             Log.e("HealthConnectManager", "Error reading heart rate records", e)
             emptyList()

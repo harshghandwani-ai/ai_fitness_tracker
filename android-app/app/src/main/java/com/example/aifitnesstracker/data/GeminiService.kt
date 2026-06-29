@@ -8,7 +8,7 @@ class GeminiService {
     // Initialize the generative model using the API Key from BuildConfig
     private val model by lazy {
         GenerativeModel(
-            modelName = "gemini-1.5-flash",
+            modelName = "gemini-2.5-flash",
             apiKey = BuildConfig.GEMINI_API_KEY
         )
     }
