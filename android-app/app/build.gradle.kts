@@ -99,4 +99,7 @@ dependencies {
 
   // Health Connect SDK
   implementation(libs.androidx.health.connect)
+
+  // Material Icons
+  implementation(libs.androidx.compose.material.icons.core)
 }
