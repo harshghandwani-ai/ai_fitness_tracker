@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
@@ -71,10 +72,12 @@ fun MainScreen(
 
     val state by viewModel.uiState.collectAsState()
 
-    // Set of permissions to request
+    // Set of permissions to request (Steps & Heart Rate)
     val permissions = setOf(
         HealthPermission.getReadPermission(StepsRecord::class),
-        HealthPermission.getWritePermission(StepsRecord::class)
+        HealthPermission.getWritePermission(StepsRecord::class),
+        HealthPermission.getReadPermission(HeartRateRecord::class),
+        HealthPermission.getWritePermission(HeartRateRecord::class)
     )
 
     // Launcher for Health Connect permission requests
@@ -96,7 +99,7 @@ fun MainScreen(
         ) {
             // Header Section
             HeaderSection(
-                onRefreshSteps = { viewModel.fetchTodaySteps() },
+                onRefreshSteps = { viewModel.fetchTodayHealthData() },
                 hasPermissions = state.hasHealthPermissions
             )
 
@@ -105,6 +108,19 @@ fun MainScreen(
             // Steps Progress Card
             StepsProgressCard(
                 steps = state.stepsCount,
+                hasPermissions = state.hasHealthPermissions,
+                isAvailable = state.isHealthConnectAvailable,
+                onSyncClick = {
+                    requestPermissionsLauncher.launch(permissions)
+                }
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Heart Rate Card
+            HeartRateCard(
+                avgBpm = state.averageHeartRate,
+                lastBpm = state.latestHeartRate,
                 hasPermissions = state.hasHealthPermissions,
                 isAvailable = state.isHealthConnectAvailable,
                 onSyncClick = {
@@ -277,6 +293,105 @@ fun StepsProgressCard(
                     color = PrimaryPurple,
                     trackColor = DarkBg
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun HeartRateCard(
+    avgBpm: Int,
+    lastBpm: Int,
+    hasPermissions: Boolean,
+    isAvailable: Boolean,
+    onSyncClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBg)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "❤️",
+                        fontSize = 20.sp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Heart Rate Monitor",
+                        color = LightText,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (!isAvailable) {
+                Text(
+                    text = "Health Connect is not supported on this device.",
+                    color = MutedText,
+                    fontSize = 14.sp
+                )
+            } else if (!hasPermissions) {
+                Text(
+                    text = "Allow AI Fitness Tracker to access your health data to monitor your heart rate statistics.",
+                    color = MutedText,
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = onSyncClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(text = "Sync Health Connect", color = LightText, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Column {
+                        Text(
+                            text = if (lastBpm > 0) "$lastBpm BPM" else "-- BPM",
+                            color = LightText,
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = "Latest Reading",
+                            color = MutedText,
+                            fontSize = 14.sp
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = if (avgBpm > 0) "$avgBpm BPM" else "-- BPM",
+                            color = AccentGreen,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Average Today",
+                            color = MutedText,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
             }
         }
     }

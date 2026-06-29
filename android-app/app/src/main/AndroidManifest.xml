@@ -4,6 +4,8 @@
     <!-- Health Connect Permissions -->
     <uses-permission android:name="android.permission.health.READ_STEPS"/>
     <uses-permission android:name="android.permission.health.WRITE_STEPS"/>
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE"/>
+    <uses-permission android:name="android.permission.health.WRITE_HEART_RATE"/>
 
     <queries>
         <!-- Query to check if Health Connect is installed on the device -->
