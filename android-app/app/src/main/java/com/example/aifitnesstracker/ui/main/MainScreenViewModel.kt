@@ -17,6 +17,7 @@ data class DashboardUiState(
     val stepsCount: Long = 0,
     val averageHeartRate: Int = 0,
     val latestHeartRate: Int = 0,
+    val sleepDurationMinutes: Long = 0,
     val isHealthConnectAvailable: Boolean = false,
     val hasHealthPermissions: Boolean = false,
     val aiRecommendation: String? = null,
@@ -52,22 +53,27 @@ class MainScreenViewModel(
 
     fun fetchTodayHealthData() {
         viewModelScope.launch {
+            val now = Instant.now()
             val startOfDay = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
-            val endOfDay = Instant.now()
+            val past24Hours = now.minus(java.time.Duration.ofDays(1))
             
             // Query Steps
-            val steps = healthConnectManager.readDailySteps(startOfDay, endOfDay)
+            val steps = healthConnectManager.readDailySteps(startOfDay, now)
             
             // Query Heart Rate
-            val heartRates = healthConnectManager.readHeartRate(startOfDay, endOfDay)
+            val heartRates = healthConnectManager.readHeartRate(startOfDay, now)
             val avgBpm = if (heartRates.isNotEmpty()) heartRates.average().toInt() else 0
             val lastBpm = if (heartRates.isNotEmpty()) heartRates.last() else 0
+            
+            // Query Sleep (Past 24 Hours)
+            val sleepMins = healthConnectManager.readSleepDuration(past24Hours, now)
             
             _uiState.update { 
                 it.copy(
                     stepsCount = steps,
                     averageHeartRate = avgBpm,
-                    latestHeartRate = lastBpm
+                    latestHeartRate = lastBpm,
+                    sleepDurationMinutes = sleepMins
                 ) 
             }
         }
@@ -79,6 +85,7 @@ class MainScreenViewModel(
             val steps = _uiState.value.stepsCount
             val avgBpm = _uiState.value.averageHeartRate
             val lastBpm = _uiState.value.latestHeartRate
+            val sleepMinsTotal = _uiState.value.sleepDurationMinutes
             
             val heartRatePart = if (avgBpm > 0) {
                 "My average heart rate today is $avgBpm BPM (with a latest reading of $lastBpm BPM)."
@@ -86,11 +93,19 @@ class MainScreenViewModel(
                 "My heart rate data is not logged yet."
             }
 
+            val sleepHours = sleepMinsTotal / 60
+            val sleepRemainingMins = sleepMinsTotal % 60
+            val sleepPart = if (sleepMinsTotal > 0) {
+                "Last night I slept for $sleepHours hours and $sleepRemainingMins minutes."
+            } else {
+                "My sleep data is not logged yet."
+            }
+
             val prompt = when (topic) {
-                "steps" -> "My step count today is $steps. $heartRatePart. Suggest a quick, personalized fitness recommendation based on these activity and heart rate levels to keep me healthy."
-                "workout" -> "Design a quick 10-minute workout routine. Currently I have completed $steps steps today. $heartRatePart."
-                "nutrition" -> "Suggest a post-workout recovery snack or meal suggestion. Today I have completed $steps steps. $heartRatePart."
-                else -> "Give me a quick general fitness motivation advice based on my step count of $steps steps and $heartRatePart today."
+                "steps" -> "My step count today is $steps. $heartRatePart. $sleepPart. Suggest a quick, personalized fitness recommendation based on these activity, heart rate, and sleep rest levels to keep me healthy."
+                "workout" -> "Design a quick 10-minute workout routine. Currently I have completed $steps steps today. $heartRatePart. $sleepPart. Tune the intensity of the workout depending on how much sleep/rest I got."
+                "nutrition" -> "Suggest a post-workout recovery snack or meal suggestion. Today I have completed $steps steps. $heartRatePart. $sleepPart."
+                else -> "Give me a quick general fitness motivation advice based on my step count of $steps steps, $heartRatePart, and $sleepPart today."
             }
             val advice = geminiService.generateFitnessAdvice(prompt)
             _uiState.update { it.copy(isAiLoading = false, aiRecommendation = advice) }

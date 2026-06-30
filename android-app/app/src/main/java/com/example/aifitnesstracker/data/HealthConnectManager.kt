@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
@@ -26,12 +27,14 @@ class HealthConnectManager(private val context: Context) {
         }
     }
 
-    // Set of permissions requested for our AI fitness tracking (Steps & Heart Rate)
+    // Set of permissions requested for our AI fitness tracking (Steps, Heart Rate & Sleep)
     val permissions = setOf(
         HealthPermission.getReadPermission(StepsRecord::class),
         HealthPermission.getWritePermission(StepsRecord::class),
         HealthPermission.getReadPermission(HeartRateRecord::class),
-        HealthPermission.getWritePermission(HeartRateRecord::class)
+        HealthPermission.getWritePermission(HeartRateRecord::class),
+        HealthPermission.getReadPermission(SleepSessionRecord::class),
+        HealthPermission.getWritePermission(SleepSessionRecord::class)
     )
 
     // Verify if all required Health Connect permissions are granted
@@ -82,6 +85,26 @@ class HealthConnectManager(private val context: Context) {
         } catch (e: Exception) {
             Log.e("HealthConnectManager", "Error reading heart rate records", e)
             emptyList()
+        }
+    }
+
+    // Read sleep session records and aggregate total sleep duration in minutes
+    suspend fun readSleepDuration(startTime: Instant, endTime: Instant): Long {
+        val client = healthConnectClient ?: return 0L
+        if (!hasAllPermissions()) return 0L
+        return try {
+            val response = client.readRecords(
+                ReadRecordsRequest(
+                    recordType = SleepSessionRecord::class,
+                    timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
+                )
+            )
+            response.records.sumOf { record ->
+                java.time.Duration.between(record.startTime, record.endTime).toMinutes()
+            }
+        } catch (e: Exception) {
+            Log.e("HealthConnectManager", "Error reading sleep session records", e)
+            0L
         }
     }
 }

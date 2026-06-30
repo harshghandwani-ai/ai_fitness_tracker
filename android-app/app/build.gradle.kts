@@ -14,6 +14,7 @@ val localProperties = Properties().apply {
     }
 }
 val geminiApiKey = localProperties.getProperty("GEMINI_API_KEY") ?: ""
+val googleClientId = localProperties.getProperty("GOOGLE_CLIENT_ID") ?: "dummy-client-id.apps.googleusercontent.com"
 
 android {
     namespace = "com.example.aifitnesstracker"
@@ -25,6 +26,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        buildConfigField("String", "GOOGLE_CLIENT_ID", "\"$googleClientId\"")
     }
 
     buildTypes {
@@ -102,4 +104,9 @@ dependencies {
 
   // Material Icons
   implementation(libs.androidx.compose.material.icons.core)
+
+  // Google Login & Credential Manager
+  implementation(libs.androidx.credentials)
+  implementation(libs.androidx.credentials.play.services)
+  implementation(libs.google.identity.googleid)
 }

@@ -22,12 +22,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,11 +40,14 @@ import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
+import com.example.aifitnesstracker.data.AuthManager
 import com.example.aifitnesstracker.data.GeminiService
 import com.example.aifitnesstracker.data.HealthConnectManager
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -60,24 +63,29 @@ val MutedText = Color(0xFF94A3B8)
 @Composable
 fun MainScreen(
     onItemClick: (NavKey) -> Unit,
+    authManager: AuthManager,
+    onSignOutSuccess: () -> Unit,
     modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current.applicationContext
-    val viewModel: MainScreenViewModel = viewModel {
+    viewModel: MainScreenViewModel = viewModel {
+        val context = LocalContext.current.applicationContext
         MainScreenViewModel(
             healthConnectManager = HealthConnectManager(context),
             geminiService = GeminiService()
         )
-    }
-
+    },
+) {
     val state by viewModel.uiState.collectAsState()
+    val session by authManager.session.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
 
-    // Set of permissions to request (Steps & Heart Rate)
+    // Set of permissions to request (Steps, Heart Rate & Sleep)
     val permissions = setOf(
         HealthPermission.getReadPermission(StepsRecord::class),
         HealthPermission.getWritePermission(StepsRecord::class),
         HealthPermission.getReadPermission(HeartRateRecord::class),
-        HealthPermission.getWritePermission(HeartRateRecord::class)
+        HealthPermission.getWritePermission(HeartRateRecord::class),
+        HealthPermission.getReadPermission(SleepSessionRecord::class),
+        HealthPermission.getWritePermission(SleepSessionRecord::class)
     )
 
     // Launcher for Health Connect permission requests
@@ -99,8 +107,15 @@ fun MainScreen(
         ) {
             // Header Section
             HeaderSection(
+                displayName = session.displayName,
                 onRefreshSteps = { viewModel.fetchTodayHealthData() },
-                hasPermissions = state.hasHealthPermissions
+                hasPermissions = state.hasHealthPermissions,
+                onLogoutClick = {
+                    coroutineScope.launch {
+                        authManager.signOut()
+                        onSignOutSuccess()
+                    }
+                }
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -130,6 +145,18 @@ fun MainScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // Sleep Card
+            SleepCard(
+                sleepDurationMinutes = state.sleepDurationMinutes,
+                hasPermissions = state.hasHealthPermissions,
+                isAvailable = state.isHealthConnectAvailable,
+                onSyncClick = {
+                    requestPermissionsLauncher.launch(permissions)
+                }
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             // AI Coach Section
             AICoachSection(
                 aiRecommendation = state.aiRecommendation,
@@ -141,7 +168,12 @@ fun MainScreen(
 }
 
 @Composable
-fun HeaderSection(onRefreshSteps: () -> Unit, hasPermissions: Boolean) {
+fun HeaderSection(
+    displayName: String,
+    onRefreshSteps: () -> Unit,
+    hasPermissions: Boolean,
+    onLogoutClick: () -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -149,7 +181,7 @@ fun HeaderSection(onRefreshSteps: () -> Unit, hasPermissions: Boolean) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Welcome Back!",
+                text = "Welcome, ${displayName.takeIf { it.isNotEmpty() } ?: "Athlete"}!",
                 color = LightText,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
@@ -160,15 +192,30 @@ fun HeaderSection(onRefreshSteps: () -> Unit, hasPermissions: Boolean) {
                 fontSize = 14.sp
             )
         }
-        if (hasPermissions) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (hasPermissions) {
+                Button(
+                    onClick = onRefreshSteps,
+                    colors = ButtonDefaults.buttonColors(containerColor = CardBg),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)
+                ) {
+                    Text(
+                        text = "🔄",
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+            }
             Button(
-                onClick = onRefreshSteps,
+                onClick = onLogoutClick,
                 colors = ButtonDefaults.buttonColors(containerColor = CardBg),
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)
             ) {
                 Text(
-                    text = "🔄",
+                    text = "🚪",
                     fontSize = 16.sp,
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
@@ -389,6 +436,114 @@ fun HeartRateCard(
                             text = "Average Today",
                             color = MutedText,
                             fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SleepCard(
+    sleepDurationMinutes: Long,
+    hasPermissions: Boolean,
+    isAvailable: Boolean,
+    onSyncClick: () -> Unit
+) {
+    val hours = sleepDurationMinutes / 60
+    val minutes = sleepDurationMinutes % 60
+    
+    val (statusText, statusColor) = when {
+        sleepDurationMinutes >= 480 -> "Optimal Rest" to AccentGreen
+        sleepDurationMinutes >= 360 -> "Moderate Rest" to PrimaryPurple
+        sleepDurationMinutes > 0 -> "Under-rested" to Color(0xFFEF4444)
+        else -> "No Logged Sleep" to MutedText
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBg)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "😴",
+                        fontSize = 20.sp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Sleep Quality Tracker",
+                        color = LightText,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (!isAvailable) {
+                Text(
+                    text = "Health Connect is not supported on this device.",
+                    color = MutedText,
+                    fontSize = 14.sp
+                )
+            } else if (!hasPermissions) {
+                Text(
+                    text = "Allow AI Fitness Tracker to access your health data to monitor your sleep statistics.",
+                    color = MutedText,
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = onSyncClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(text = "Sync Health Connect", color = LightText, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Column {
+                        Text(
+                            text = if (sleepDurationMinutes > 0) "${hours}h ${minutes}m" else "--h --m",
+                            color = LightText,
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = "Total Sleep Last Night",
+                            color = MutedText,
+                            fontSize = 14.sp
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(statusColor.copy(alpha = 0.15f))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = statusText,
+                            color = statusColor,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
