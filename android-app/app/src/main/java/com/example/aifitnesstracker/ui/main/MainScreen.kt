@@ -40,10 +40,17 @@ import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
 import androidx.health.connect.client.records.HydrationRecord
+import androidx.health.connect.client.records.RespiratoryRateRecord
+import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
+import androidx.health.connect.client.records.SpeedRecord
+import androidx.health.connect.client.records.SkinTemperatureRecord
 import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
@@ -75,7 +82,7 @@ fun MainScreen(
     }
     val state by viewModel.uiState.collectAsState()
 
-    // Set of permissions to request (all health dimensions)
+    // Complete list of permissions for all 11 wearable metrics
     val permissions = setOf(
         HealthPermission.getReadPermission(StepsRecord::class),
         HealthPermission.getWritePermission(StepsRecord::class),
@@ -90,10 +97,23 @@ fun MainScreen(
         HealthPermission.getReadPermission(HydrationRecord::class),
         HealthPermission.getWritePermission(HydrationRecord::class),
         HealthPermission.getReadPermission(WeightRecord::class),
-        HealthPermission.getWritePermission(WeightRecord::class)
+        HealthPermission.getWritePermission(WeightRecord::class),
+        HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+        HealthPermission.getWritePermission(ExerciseSessionRecord::class),
+        HealthPermission.getReadPermission(SpeedRecord::class),
+        HealthPermission.getWritePermission(SpeedRecord::class),
+        HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
+        HealthPermission.getWritePermission(TotalCaloriesBurnedRecord::class),
+        HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+        HealthPermission.getWritePermission(HeartRateVariabilityRmssdRecord::class),
+        HealthPermission.getReadPermission(RespiratoryRateRecord::class),
+        HealthPermission.getWritePermission(RespiratoryRateRecord::class),
+        HealthPermission.getReadPermission(RestingHeartRateRecord::class),
+        HealthPermission.getWritePermission(RestingHeartRateRecord::class),
+        HealthPermission.getReadPermission(SkinTemperatureRecord::class),
+        HealthPermission.getWritePermission(SkinTemperatureRecord::class)
     )
 
-    // Launcher for Health Connect permission requests
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract()
     ) { grantedPermissions ->
@@ -120,10 +140,12 @@ fun MainScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Primary Activity Card: Steps & Distance
+            // Primary Activity Hub: Steps, Distance, Speed, Workouts
             StepsProgressCard(
                 steps = state.stepsCount,
                 distanceKm = state.distanceKm,
+                speedKmh = state.speedKmh,
+                exerciseSessions = state.exerciseSessionsCount,
                 hasPermissions = state.hasHealthPermissions,
                 isAvailable = state.isHealthConnectAvailable,
                 onSyncClick = {
@@ -139,6 +161,7 @@ fun MainScreen(
                     HeartRateCard(
                         avgBpm = state.averageHeartRate,
                         lastBpm = state.latestHeartRate,
+                        restingBpm = state.restingHeartRateBpm,
                         hasPermissions = state.hasHealthPermissions,
                         isAvailable = state.isHealthConnectAvailable,
                         onSyncClick = { requestPermissionsLauncher.launch(permissions) }
@@ -157,11 +180,12 @@ fun MainScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Row 3: Active Calories & Hydration (2 Columns)
+            // Row 3: Calories & Hydration (2 Columns)
             Row(modifier = Modifier.fillMaxWidth()) {
                 Box(modifier = Modifier.weight(1f)) {
                     CaloriesCard(
-                        caloriesKcal = state.caloriesBurned,
+                        totalCalories = state.totalCaloriesBurned,
+                        activeCalories = state.activeCaloriesBurned,
                         hasPermissions = state.hasHealthPermissions,
                         isAvailable = state.isHealthConnectAvailable,
                         onSyncClick = { requestPermissionsLauncher.launch(permissions) }
@@ -180,8 +204,11 @@ fun MainScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Row 4: Weight Card (Full Width)
-            WeightCard(
+            // Row 4: Advanced Vitals Panel (HRV, Respiratory, Skin Temp, Weight)
+            VitalsPanelCard(
+                hrvMs = state.hrvRmssdMs,
+                respiratoryBpm = state.respiratoryRateBpm,
+                skinTempC = state.skinTempCelsius,
                 weightKg = state.weightKg,
                 hasPermissions = state.hasHealthPermissions,
                 isAvailable = state.isHealthConnectAvailable,
@@ -254,6 +281,8 @@ fun HeaderSection(
 fun StepsProgressCard(
     steps: Long,
     distanceKm: Double,
+    speedKmh: Double,
+    exerciseSessions: Int,
     hasPermissions: Boolean,
     isAvailable: Boolean,
     onSyncClick: () -> Unit
@@ -283,7 +312,7 @@ fun StepsProgressCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Daily Activity",
+                        text = "Activity Hub",
                         color = LightText,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
@@ -316,7 +345,7 @@ fun StepsProgressCard(
                 )
             } else if (!hasPermissions) {
                 Text(
-                    text = "Sync Health Connect to display steps and distance.",
+                    text = "Sync Health Connect to display activity data.",
                     color = MutedText,
                     fontSize = 14.sp
                 )
@@ -368,6 +397,33 @@ fun StepsProgressCard(
                     color = PrimaryPurple,
                     trackColor = DarkBg
                 )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Exercise and Speed Grid Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(text = "⚡ Current Speed", color = MutedText, fontSize = 12.sp)
+                        Text(
+                            text = String.format("%.1f km/h", speedKmh),
+                            color = LightText,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(text = "🏋️‍♂️ Exercises Today", color = MutedText, fontSize = 12.sp)
+                        Text(
+                            text = "$exerciseSessions sessions",
+                            color = LightText,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
     }
@@ -377,6 +433,7 @@ fun StepsProgressCard(
 fun HeartRateCard(
     avgBpm: Int,
     lastBpm: Int,
+    restingBpm: Int,
     hasPermissions: Boolean,
     isAvailable: Boolean,
     onSyncClick: () -> Unit
@@ -398,7 +455,7 @@ fun HeartRateCard(
                 fontWeight = FontWeight.SemiBold
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             if (!hasPermissions || !isAvailable) {
                 Text(text = "-- BPM", color = MutedText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -410,9 +467,9 @@ fun HeartRateCard(
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    text = if (avgBpm > 0) "Avg: $avgBpm BPM" else "Avg: --",
+                    text = String.format("Avg: %d | Resting: %d", avgBpm, restingBpm),
                     color = AccentGreen,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(top = 4.dp)
                 )
@@ -449,13 +506,13 @@ fun SleepCard(
                 .padding(20.dp)
         ) {
             Text(
-                text = "😴 Sleep Rest",
+                text = "😴 Sleep",
                 color = LightText,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             if (!hasPermissions || !isAvailable) {
                 Text(text = "--h --m", color = MutedText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -467,9 +524,9 @@ fun SleepCard(
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    text = "Rest: $statusText",
+                    text = "Rest Quality: $statusText",
                     color = PrimaryPurple,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(top = 4.dp)
                 )
@@ -480,7 +537,8 @@ fun SleepCard(
 
 @Composable
 fun CaloriesCard(
-    caloriesKcal: Long,
+    totalCalories: Long,
+    activeCalories: Long,
     hasPermissions: Boolean,
     isAvailable: Boolean,
     onSyncClick: () -> Unit
@@ -502,21 +560,21 @@ fun CaloriesCard(
                 fontWeight = FontWeight.SemiBold
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             if (!hasPermissions || !isAvailable) {
                 Text(text = "-- kcal", color = MutedText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             } else {
                 Text(
-                    text = "$caloriesKcal kcal",
+                    text = "$totalCalories kcal",
                     color = LightText,
                     fontSize = 26.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    text = "Active Burn",
+                    text = "Active Burn: $activeCalories kcal",
                     color = MutedText,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
@@ -551,7 +609,7 @@ fun HydrationCard(
                 fontWeight = FontWeight.SemiBold
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             if (!hasPermissions || !isAvailable) {
                 Text(text = "-- ml", color = MutedText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -563,7 +621,7 @@ fun HydrationCard(
                     fontWeight = FontWeight.ExtraBold
                 )
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 LinearProgressIndicator(
                     progress = { progress },
@@ -580,7 +638,10 @@ fun HydrationCard(
 }
 
 @Composable
-fun WeightCard(
+fun VitalsPanelCard(
+    hrvMs: Double,
+    respiratoryBpm: Double,
+    skinTempC: Double,
     weightKg: Double,
     hasPermissions: Boolean,
     isAvailable: Boolean,
@@ -588,35 +649,75 @@ fun WeightCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = CardBg)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(24.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "⚖️",
-                    fontSize = 20.sp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Body Weight Profile",
-                    color = LightText,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
             Text(
-                text = if (weightKg > 0) String.format("%.1f kg", weightKg) else "--.- kg",
-                color = AccentGreen,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
+                text = "📊 Vitals & Biomarkers",
+                color = LightText,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
             )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (!hasPermissions || !isAvailable) {
+                Text(
+                    text = "Sync Health Connect to display wearable vitals logs.",
+                    color = MutedText,
+                    fontSize = 14.sp
+                )
+            } else {
+                // 2x2 Grid of medical logs
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "📈 HRV (RMSSD)", color = MutedText, fontSize = 12.sp)
+                            Text(
+                                text = if (hrvMs > 0) String.format("%.1f ms", hrvMs) else "-- ms",
+                                color = LightText,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "🫁 Respiratory Rate", color = MutedText, fontSize = 12.sp)
+                            Text(
+                                text = if (respiratoryBpm > 0) String.format("%.1f bpm", respiratoryBpm) else "-- bpm",
+                                color = LightText,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "🌡️ Skin Temperature", color = MutedText, fontSize = 12.sp)
+                            Text(
+                                text = if (skinTempC > 0) String.format("%.1f °C", skinTempC) else "--.- °C",
+                                color = LightText,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "⚖️ Body Weight", color = MutedText, fontSize = 12.sp)
+                            Text(
+                                text = if (weightKg > 0) String.format("%.1f kg", weightKg) else "--.- kg",
+                                color = AccentGreen,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

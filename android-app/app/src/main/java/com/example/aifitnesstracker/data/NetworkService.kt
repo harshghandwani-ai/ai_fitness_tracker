@@ -15,11 +15,18 @@ class NetworkService {
 
     suspend fun syncHealthData(
         steps: Long,
+        distanceKm: Double,
+        speedKmh: Double,
+        exerciseSessionsCount: Int,
+        activeCaloriesBurned: Long,
+        totalCaloriesBurned: Long,
+        sleepMinutes: Long,
         avgHr: Int,
         latestHr: Int,
-        sleepMinutes: Long,
-        caloriesBurned: Long,
-        distanceKm: Double,
+        hrvRmssdMs: Double,
+        respiratoryRateBpm: Double,
+        restingHeartRateBpm: Int,
+        skinTempCelsius: Double,
         hydrationMl: Double,
         weightKg: Double
     ): Boolean = withContext(Dispatchers.IO) {
@@ -34,11 +41,18 @@ class NetworkService {
                 put("userId", "athlete_user")
                 put("date", LocalDate.now().toString())
                 put("steps", steps)
+                put("distanceKm", distanceKm)
+                put("speedKmh", speedKmh)
+                put("exerciseSessionsCount", exerciseSessionsCount)
+                put("activeCaloriesBurned", activeCaloriesBurned)
+                put("totalCaloriesBurned", totalCaloriesBurned)
+                put("sleepMinutes", sleepMinutes)
                 put("avgHeartRate", avgHr)
                 put("latestHeartRate", latestHr)
-                put("sleepMinutes", sleepMinutes)
-                put("caloriesBurned", caloriesBurned)
-                put("distanceKm", distanceKm)
+                put("hrvRmssdMs", hrvRmssdMs)
+                put("respiratoryRateBpm", respiratoryRateBpm)
+                put("restingHeartRateBpm", restingHeartRateBpm)
+                put("skinTempCelsius", skinTempCelsius)
                 put("hydrationMl", hydrationMl)
                 put("weightKg", weightKg)
                 put("timestamp", System.currentTimeMillis() / 1000)
@@ -65,11 +79,18 @@ class NetworkService {
 
     suspend fun fetchAiAdvice(
         steps: Long,
+        distanceKm: Double,
+        speedKmh: Double,
+        exerciseSessionsCount: Int,
+        activeCaloriesBurned: Long,
+        totalCaloriesBurned: Long,
+        sleepMinutes: Long,
         avgHr: Int,
         latestHr: Int,
-        sleepMinutes: Long,
-        caloriesBurned: Long,
-        distanceKm: Double,
+        hrvRmssdMs: Double,
+        respiratoryRateBpm: Double,
+        restingHeartRateBpm: Int,
+        skinTempCelsius: Double,
         hydrationMl: Double,
         weightKg: Double,
         topic: String
@@ -83,11 +104,18 @@ class NetworkService {
 
             val payload = JSONObject().apply {
                 put("steps", steps)
+                put("distanceKm", distanceKm)
+                put("speedKmh", speedKmh)
+                put("exerciseSessionsCount", exerciseSessionsCount)
+                put("activeCaloriesBurned", activeCaloriesBurned)
+                put("totalCaloriesBurned", totalCaloriesBurned)
+                put("sleepMinutes", sleepMinutes)
                 put("avgHeartRate", avgHr)
                 put("latestHeartRate", latestHr)
-                put("sleepMinutes", sleepMinutes)
-                put("caloriesBurned", caloriesBurned)
-                put("distanceKm", distanceKm)
+                put("hrvRmssdMs", hrvRmssdMs)
+                put("respiratoryRateBpm", respiratoryRateBpm)
+                put("restingHeartRateBpm", restingHeartRateBpm)
+                put("skinTempCelsius", skinTempCelsius)
                 put("hydrationMl", hydrationMl)
                 put("weightKg", weightKg)
                 put("topic", topic)

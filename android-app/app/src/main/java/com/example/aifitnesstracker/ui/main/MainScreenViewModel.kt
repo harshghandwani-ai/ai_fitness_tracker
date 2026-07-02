@@ -15,11 +15,18 @@ import java.time.ZoneId
 
 data class DashboardUiState(
     val stepsCount: Long = 0,
+    val distanceKm: Double = 0.0,
+    val speedKmh: Double = 0.0,
+    val exerciseSessionsCount: Int = 0,
+    val activeCaloriesBurned: Long = 0,
+    val totalCaloriesBurned: Long = 0,
+    val sleepDurationMinutes: Long = 0,
     val averageHeartRate: Int = 0,
     val latestHeartRate: Int = 0,
-    val sleepDurationMinutes: Long = 0,
-    val caloriesBurned: Long = 0,
-    val distanceKm: Double = 0.0,
+    val hrvRmssdMs: Double = 0.0,
+    val respiratoryRateBpm: Double = 0.0,
+    val restingHeartRateBpm: Int = 0,
+    val skinTempCelsius: Double = 0.0,
     val hydrationMl: Double = 0.0,
     val weightKg: Double = 0.0,
     val isHealthConnectAvailable: Boolean = false,
@@ -66,19 +73,40 @@ class MainScreenViewModel(
             // Query Steps
             val steps = healthConnectManager.readDailySteps(startOfDay, now)
             
+            // Query Distance
+            val distance = healthConnectManager.readDistance(startOfDay, now)
+
+            // Query Speed
+            val speed = healthConnectManager.readLatestSpeed(startOfDay, now)
+
+            // Query Exercise Sessions
+            val exercises = healthConnectManager.readExerciseSessionsCount(startOfDay, now)
+
+            // Query Active Calories
+            val activeCalories = healthConnectManager.readActiveCaloriesBurned(startOfDay, now)
+
+            // Query Total Calories (Active + Resting)
+            val totalCalories = healthConnectManager.readTotalCaloriesBurned(startOfDay, now)
+
+            // Query Sleep (Past 24 Hours)
+            val sleepMins = healthConnectManager.readSleepDuration(past24Hours, now)
+            
             // Query Heart Rate
             val heartRates = healthConnectManager.readHeartRate(startOfDay, now)
             val avgBpm = if (heartRates.isNotEmpty()) heartRates.average().toInt() else 0
             val lastBpm = if (heartRates.isNotEmpty()) heartRates.last() else 0
-            
-            // Query Sleep (Past 24 Hours)
-            val sleepMins = healthConnectManager.readSleepDuration(past24Hours, now)
 
-            // Query Calories
-            val calories = healthConnectManager.readActiveCaloriesBurned(startOfDay, now)
+            // Query HRV
+            val hrv = healthConnectManager.readLatestHrv(startOfDay, now)
 
-            // Query Distance
-            val distance = healthConnectManager.readDistance(startOfDay, now)
+            // Query Respiratory Rate
+            val respiratory = healthConnectManager.readLatestRespiratoryRate(startOfDay, now)
+
+            // Query Resting Heart Rate
+            val restingHr = healthConnectManager.readLatestRestingHeartRate(startOfDay, now)
+
+            // Query Skin Temperature
+            val skinTemp = healthConnectManager.readLatestSkinTemperature(startOfDay, now)
 
             // Query Hydration
             val hydration = healthConnectManager.readHydration(startOfDay, now)
@@ -89,11 +117,18 @@ class MainScreenViewModel(
             _uiState.update { 
                 it.copy(
                     stepsCount = steps,
+                    distanceKm = distance,
+                    speedKmh = speed,
+                    exerciseSessionsCount = exercises,
+                    activeCaloriesBurned = activeCalories,
+                    totalCaloriesBurned = totalCalories,
+                    sleepDurationMinutes = sleepMins,
                     averageHeartRate = avgBpm,
                     latestHeartRate = lastBpm,
-                    sleepDurationMinutes = sleepMins,
-                    caloriesBurned = calories,
-                    distanceKm = distance,
+                    hrvRmssdMs = hrv,
+                    respiratoryRateBpm = respiratory,
+                    restingHeartRateBpm = restingHr,
+                    skinTempCelsius = skinTemp,
                     hydrationMl = hydration,
                     weightKg = weight,
                     isSynced = false
@@ -104,11 +139,18 @@ class MainScreenViewModel(
             _uiState.update { it.copy(isSyncing = true) }
             val success = networkService.syncHealthData(
                 steps = steps,
+                distanceKm = distance,
+                speedKmh = speed,
+                exerciseSessionsCount = exercises,
+                activeCaloriesBurned = activeCalories,
+                totalCaloriesBurned = totalCalories,
+                sleepMinutes = sleepMins,
                 avgHr = avgBpm,
                 latestHr = lastBpm,
-                sleepMinutes = sleepMins,
-                caloriesBurned = calories,
-                distanceKm = distance,
+                hrvRmssdMs = hrv,
+                respiratoryRateBpm = respiratory,
+                restingHeartRateBpm = restingHr,
+                skinTempCelsius = skinTemp,
                 hydrationMl = hydration,
                 weightKg = weight
             )
@@ -119,22 +161,37 @@ class MainScreenViewModel(
     fun generateAiFitnessAdvice(topic: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAiLoading = true, aiRecommendation = null) }
+            
             val steps = _uiState.value.stepsCount
+            val distance = _uiState.value.distanceKm
+            val speed = _uiState.value.speedKmh
+            val exercises = _uiState.value.exerciseSessionsCount
+            val activeCalories = _uiState.value.activeCaloriesBurned
+            val totalCalories = _uiState.value.totalCaloriesBurned
+            val sleepMins = _uiState.value.sleepDurationMinutes
             val avgBpm = _uiState.value.averageHeartRate
             val lastBpm = _uiState.value.latestHeartRate
-            val sleepMins = _uiState.value.sleepDurationMinutes
-            val calories = _uiState.value.caloriesBurned
-            val distance = _uiState.value.distanceKm
+            val hrv = _uiState.value.hrvRmssdMs
+            val respiratory = _uiState.value.respiratoryRateBpm
+            val restingHr = _uiState.value.restingHeartRateBpm
+            val skinTemp = _uiState.value.skinTempCelsius
             val hydration = _uiState.value.hydrationMl
             val weight = _uiState.value.weightKg
 
             val advice = networkService.fetchAiAdvice(
                 steps = steps,
+                distanceKm = distance,
+                speedKmh = speed,
+                exerciseSessionsCount = exercises,
+                activeCaloriesBurned = activeCalories,
+                totalCaloriesBurned = totalCalories,
+                sleepMinutes = sleepMins,
                 avgHr = avgBpm,
                 latestHr = lastBpm,
-                sleepMinutes = sleepMins,
-                caloriesBurned = calories,
-                distanceKm = distance,
+                hrvRmssdMs = hrv,
+                respiratoryRateBpm = respiratory,
+                restingHeartRateBpm = restingHr,
+                skinTempCelsius = skinTemp,
                 hydrationMl = hydration,
                 weightKg = weight,
                 topic = topic

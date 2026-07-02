@@ -40,7 +40,7 @@ class MockUrlResponse:
                 {
                     "content": {
                         "parts": [
-                            {"text": "This is a simulated workout and rest recommendation based on your steps, heart rate, sleep, calories, hydration, and weight stats."}
+                            {"text": "Simulated Gemini coach recommendation using 11 wearable metrics: Steps, Distance, Speed, Exercises, Calories, Sleep, HR, HRV, Respiratory Rate, Resting HR, and Skin Temp."}
                         ]
                     }
                 }
@@ -68,13 +68,20 @@ sync_event = {
     "body": json.dumps({
         "userId": "harsh_test",
         "date": "2026-07-02",
-        "steps": 8450,
-        "avgHeartRate": 72,
-        "latestHeartRate": 68,
-        "sleepMinutes": 480,
-        "caloriesBurned": 350,
-        "distanceKm": 5.4,
-        "hydrationMl": 1500.0,
+        "steps": 12000,
+        "distanceKm": 8.2,
+        "speedKmh": 5.8,
+        "exerciseSessionsCount": 1,
+        "activeCaloriesBurned": 450,
+        "totalCaloriesBurned": 2100,
+        "sleepMinutes": 490,
+        "avgHeartRate": 74,
+        "latestHeartRate": 70,
+        "hrvRmssdMs": 62.5,
+        "respiratoryRateBpm": 15.5,
+        "restingHeartRateBpm": 58,
+        "skinTempCelsius": 36.4,
+        "hydrationMl": 2000.0,
         "weightKg": 74.5,
         "timestamp": 1782349823
     })
@@ -96,15 +103,22 @@ advice_event = {
     "rawPath": "/advice",
     "requestContext": {"http": {"method": "POST"}},
     "body": json.dumps({
-        "steps": 8450,
-        "avgHeartRate": 72,
-        "latestHeartRate": 68,
-        "sleepMinutes": 480,
-        "caloriesBurned": 350,
-        "distanceKm": 5.4,
-        "hydrationMl": 1500.0,
+        "steps": 12000,
+        "distanceKm": 8.2,
+        "speedKmh": 5.8,
+        "exerciseSessionsCount": 1,
+        "activeCaloriesBurned": 450,
+        "totalCaloriesBurned": 2100,
+        "sleepMinutes": 490,
+        "avgHeartRate": 74,
+        "latestHeartRate": 70,
+        "hrvRmssdMs": 62.5,
+        "respiratoryRateBpm": 15.5,
+        "restingHeartRateBpm": 58,
+        "skinTempCelsius": 36.4,
+        "hydrationMl": 2000.0,
         "weightKg": 74.5,
-        "topic": "workout"
+        "topic": "steps"
     })
 }
 res = index.handler(advice_event, None)

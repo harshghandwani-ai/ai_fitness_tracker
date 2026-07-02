@@ -65,11 +65,18 @@ def handle_sync(event):
         'userId': user_id,
         'date': date_str,
         'steps': body.get('steps', 0),
+        'distanceKm': body.get('distanceKm', 0.0),
+        'speedKmh': body.get('speedKmh', 0.0),
+        'exerciseSessionsCount': body.get('exerciseSessionsCount', 0),
+        'activeCaloriesBurned': body.get('activeCaloriesBurned', 0),
+        'totalCaloriesBurned': body.get('totalCaloriesBurned', 0),
+        'sleepMinutes': body.get('sleepMinutes', 0),
         'avgHeartRate': body.get('avgHeartRate', 0),
         'latestHeartRate': body.get('latestHeartRate', 0),
-        'sleepMinutes': body.get('sleepMinutes', 0),
-        'caloriesBurned': body.get('caloriesBurned', 0),
-        'distanceKm': body.get('distanceKm', 0.0),
+        'hrvRmssdMs': body.get('hrvRmssdMs', 0.0),
+        'respiratoryRateBpm': body.get('respiratoryRateBpm', 0.0),
+        'restingHeartRateBpm': body.get('restingHeartRateBpm', 0),
+        'skinTempCelsius': body.get('skinTempCelsius', 0.0),
         'hydrationMl': body.get('hydrationMl', 0.0),
         'weightKg': body.get('weightKg', 0.0),
         'timestamp': int(body.get('timestamp', 0))
@@ -93,11 +100,18 @@ def handle_get_metrics(event):
 def handle_generate_advice(event):
     body = json.loads(event.get('body', '{}'))
     steps = body.get('steps', 0)
+    distance = body.get('distanceKm', 0.0)
+    speed = body.get('speedKmh', 0.0)
+    exercises = body.get('exerciseSessionsCount', 0)
+    active_cal = body.get('activeCaloriesBurned', 0)
+    total_cal = body.get('totalCaloriesBurned', 0)
+    sleep_mins = body.get('sleepMinutes', 0)
     avg_hr = body.get('avgHeartRate', 0)
     latest_hr = body.get('latestHeartRate', 0)
-    sleep_mins = body.get('sleepMinutes', 0)
-    calories = body.get('caloriesBurned', 0)
-    distance = body.get('distanceKm', 0.0)
+    hrv = body.get('hrvRmssdMs', 0.0)
+    respiratory = body.get('respiratoryRateBpm', 0.0)
+    resting_hr = body.get('restingHeartRateBpm', 0)
+    skin_temp = body.get('skinTempCelsius', 0.0)
     hydration = body.get('hydrationMl', 0.0)
     weight = body.get('weightKg', 0.0)
     topic = body.get('topic', 'steps')
@@ -111,8 +125,13 @@ def handle_generate_advice(event):
     sleep_remainder = sleep_mins % 60
     
     prompt = f"You are a helpful personal AI Fitness Coach. Today the user has logged: " \
-             f"{steps} steps ({distance:.2f} km traveled), active calories burned: {calories} kcal, " \
-             f"average heart rate of {avg_hr} BPM (latest reading: {latest_hr} BPM), " \
+             f"{steps} steps ({distance:.2f} km traveled at average speed of {speed:.1f} km/h), " \
+             f"exercises completed: {exercises} sessions, " \
+             f"total calories burned: {total_cal} kcal (active: {active_cal} kcal), " \
+             f"average heart rate of {avg_hr} BPM (latest: {latest_hr} BPM, resting HR: {resting_hr} BPM), " \
+             f"heart rate variability (HRV): {hrv:.1f} ms, " \
+             f"respiratory rate: {respiratory:.1f} bpm, " \
+             f"skin temperature measurement: {skin_temp:.1f} °C, " \
              f"water intake of {hydration:.0f} ml, body weight: {weight:.1f} kg, " \
              f"and slept for {sleep_hours}h {sleep_remainder}m last night. "
              
@@ -123,7 +142,7 @@ def handle_generate_advice(event):
     else:
         prompt += "Suggest a suitable post-workout nutrition or recovery snack for this daily log."
         
-    # Query Gemini API via direct HTTPS request (no heavy pip dependencies needed)
+    # Query Gemini API via direct HTTPS request
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     payload = {
@@ -146,7 +165,7 @@ def response_json(status_code, data):
         "statusCode": status_code,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*" # CORS enabled
+            "Access-Control-Allow-Origin": "*"
         },
         "body": json.dumps(data, cls=DecimalEncoder)
     }
