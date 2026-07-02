@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AWS Serverless Backend for AI Fitness Tracker (Cognito, Lambda, DynamoDB)
+
+Resources:
+  # DynamoDB Table for storing daily stats
+  FitnessTrackerTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: FitnessTrackerTable
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: date
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST # Zero cost when not in use
+
+  # Lambda function coordinating routes
+  FitnessTrackerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: index.handler
+      Runtime: python3.11
+      Timeout: 15
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref FitnessTrackerTable
+      Policies:
+        # Give Lambda permission to read/write to the DynamoDB table
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FitnessTrackerTable
+        # Give Lambda permission to read SSM Parameter Store parameter
+        - SSMParameterReadPolicy:
+            ParameterName: fitness_tracker/gemini_api_key
+      Events:
+        # Configure API Gateway HTTP triggers
+        SyncEvent:
+          Type: HttpApi
+          Properties:
+            Path: /sync
+            Method: POST
+        GetMetricsEvent:
+          Type: HttpApi
+          Properties:
+            Path: /metrics
+            Method: GET
+        AdviceEvent:
+          Type: HttpApi
+          Properties:
+            Path: /advice
+            Method: POST
+
+Outputs:
+  ApiUrl:
+    Description: "API Gateway Base URL"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"

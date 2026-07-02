@@ -1,0 +1,46 @@
+name: Deploy AWS Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**' # Only trigger if files under /backend change
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout repository code
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # 2. Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # 3. Install AWS SAM CLI
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      # 4. Configure AWS Credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      # 5. Build Serverless Stack
+      - name: SAM Build
+        run: |
+          cd backend
+          sam build
+
+      # 6. Deploy Stack (uses parameters saved in your samconfig.toml)
+      - name: SAM Deploy
+        run: |
+          cd backend
+          sam deploy --no-confirm-changeset --no-fail-on-empty-changeset

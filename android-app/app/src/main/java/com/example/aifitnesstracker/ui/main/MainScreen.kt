@@ -44,10 +44,8 @@ import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
-import com.example.aifitnesstracker.data.AuthManager
 import com.example.aifitnesstracker.data.GeminiService
 import com.example.aifitnesstracker.data.HealthConnectManager
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -63,20 +61,16 @@ val MutedText = Color(0xFF94A3B8)
 @Composable
 fun MainScreen(
     onItemClick: (NavKey) -> Unit,
-    authManager: AuthManager,
-    onSignOutSuccess: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: MainScreenViewModel = viewModel {
-        val context = LocalContext.current.applicationContext
+) {
+    val context = LocalContext.current.applicationContext
+    val viewModel: MainScreenViewModel = viewModel {
         MainScreenViewModel(
             healthConnectManager = HealthConnectManager(context),
             geminiService = GeminiService()
         )
-    },
-) {
+    }
     val state by viewModel.uiState.collectAsState()
-    val session by authManager.session.collectAsState()
-    val coroutineScope = rememberCoroutineScope()
 
     // Set of permissions to request (Steps, Heart Rate & Sleep)
     val permissions = setOf(
@@ -107,15 +101,8 @@ fun MainScreen(
         ) {
             // Header Section
             HeaderSection(
-                displayName = session.displayName,
                 onRefreshSteps = { viewModel.fetchTodayHealthData() },
-                hasPermissions = state.hasHealthPermissions,
-                onLogoutClick = {
-                    coroutineScope.launch {
-                        authManager.signOut()
-                        onSignOutSuccess()
-                    }
-                }
+                hasPermissions = state.hasHealthPermissions
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -168,12 +155,7 @@ fun MainScreen(
 }
 
 @Composable
-fun HeaderSection(
-    displayName: String,
-    onRefreshSteps: () -> Unit,
-    hasPermissions: Boolean,
-    onLogoutClick: () -> Unit
-) {
+fun HeaderSection(onRefreshSteps: () -> Unit, hasPermissions: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -181,7 +163,7 @@ fun HeaderSection(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Welcome, ${displayName.takeIf { it.isNotEmpty() } ?: "Athlete"}!",
+                text = "Welcome Back!",
                 color = LightText,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
@@ -192,30 +174,15 @@ fun HeaderSection(
                 fontSize = 14.sp
             )
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (hasPermissions) {
-                Button(
-                    onClick = onRefreshSteps,
-                    colors = ButtonDefaults.buttonColors(containerColor = CardBg),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)
-                ) {
-                    Text(
-                        text = "🔄",
-                        fontSize = 16.sp,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-            }
+        if (hasPermissions) {
             Button(
-                onClick = onLogoutClick,
+                onClick = onRefreshSteps,
                 colors = ButtonDefaults.buttonColors(containerColor = CardBg),
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp)
             ) {
                 Text(
-                    text = "🚪",
+                    text = "🔄",
                     fontSize = 16.sp,
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
