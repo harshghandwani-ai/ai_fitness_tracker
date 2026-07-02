@@ -26,35 +26,14 @@ jobs:
       run: chmod +x gradlew
       working-directory: android-app
 
-    - name: Build Release APK & Bundle
-      run: ./gradlew assembleRelease bundleRelease
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug
       working-directory: android-app
-
-    - name: Sign APK
-      uses: r0adkll/sign-android-release@v1
-      id: sign_app
-      with:
-        releaseDirectory: android-app/app/build/outputs/apk/release
-        signingKeyBase64: ${{ secrets.ANDROID_KEYSTORE }}
-        alias: ${{ secrets.KEY_ALIAS }}
-        keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-        keyPassword: ${{ secrets.KEY_PASSWORD }}
-
-    - name: Sign AAB
-      uses: r0adkll/sign-android-release@v1
-      id: sign_aab
-      with:
-        releaseDirectory: android-app/app/build/outputs/bundle/release
-        signingKeyBase64: ${{ secrets.ANDROID_KEYSTORE }}
-        alias: ${{ secrets.KEY_ALIAS }}
-        keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-        keyPassword: ${{ secrets.KEY_PASSWORD }}
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          ${{ steps.sign_app.outputs.signedReleaseFile }}
-          ${{ steps.sign_aab.outputs.signedReleaseFile }}
+          android-app/app/build/outputs/apk/debug/app-debug.apk
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
