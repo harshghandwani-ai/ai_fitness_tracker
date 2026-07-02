@@ -2,8 +2,8 @@ package com.example.aifitnesstracker.ui.main
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.aifitnesstracker.data.GeminiService
 import com.example.aifitnesstracker.data.HealthConnectManager
+import com.example.aifitnesstracker.data.NetworkService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,15 +18,21 @@ data class DashboardUiState(
     val averageHeartRate: Int = 0,
     val latestHeartRate: Int = 0,
     val sleepDurationMinutes: Long = 0,
+    val caloriesBurned: Long = 0,
+    val distanceKm: Double = 0.0,
+    val hydrationMl: Double = 0.0,
+    val weightKg: Double = 0.0,
     val isHealthConnectAvailable: Boolean = false,
     val hasHealthPermissions: Boolean = false,
     val aiRecommendation: String? = null,
-    val isAiLoading: Boolean = false
+    val isAiLoading: Boolean = false,
+    val isSyncing: Boolean = false,
+    val isSynced: Boolean = false
 )
 
 class MainScreenViewModel(
     private val healthConnectManager: HealthConnectManager,
-    private val geminiService: GeminiService
+    private val networkService: NetworkService = NetworkService()
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -67,15 +73,46 @@ class MainScreenViewModel(
             
             // Query Sleep (Past 24 Hours)
             val sleepMins = healthConnectManager.readSleepDuration(past24Hours, now)
+
+            // Query Calories
+            val calories = healthConnectManager.readActiveCaloriesBurned(startOfDay, now)
+
+            // Query Distance
+            val distance = healthConnectManager.readDistance(startOfDay, now)
+
+            // Query Hydration
+            val hydration = healthConnectManager.readHydration(startOfDay, now)
+
+            // Query Weight
+            val weight = healthConnectManager.readLatestWeight(startOfDay, now)
             
             _uiState.update { 
                 it.copy(
                     stepsCount = steps,
                     averageHeartRate = avgBpm,
                     latestHeartRate = lastBpm,
-                    sleepDurationMinutes = sleepMins
+                    sleepDurationMinutes = sleepMins,
+                    caloriesBurned = calories,
+                    distanceKm = distance,
+                    hydrationMl = hydration,
+                    weightKg = weight,
+                    isSynced = false
                 ) 
             }
+
+            // Sync metrics with AWS DynamoDB
+            _uiState.update { it.copy(isSyncing = true) }
+            val success = networkService.syncHealthData(
+                steps = steps,
+                avgHr = avgBpm,
+                latestHr = lastBpm,
+                sleepMinutes = sleepMins,
+                caloriesBurned = calories,
+                distanceKm = distance,
+                hydrationMl = hydration,
+                weightKg = weight
+            )
+            _uiState.update { it.copy(isSyncing = false, isSynced = success) }
         }
     }
 
@@ -85,30 +122,30 @@ class MainScreenViewModel(
             val steps = _uiState.value.stepsCount
             val avgBpm = _uiState.value.averageHeartRate
             val lastBpm = _uiState.value.latestHeartRate
-            val sleepMinsTotal = _uiState.value.sleepDurationMinutes
+            val sleepMins = _uiState.value.sleepDurationMinutes
+            val calories = _uiState.value.caloriesBurned
+            val distance = _uiState.value.distanceKm
+            val hydration = _uiState.value.hydrationMl
+            val weight = _uiState.value.weightKg
+
+            val advice = networkService.fetchAiAdvice(
+                steps = steps,
+                avgHr = avgBpm,
+                latestHr = lastBpm,
+                sleepMinutes = sleepMins,
+                caloriesBurned = calories,
+                distanceKm = distance,
+                hydrationMl = hydration,
+                weightKg = weight,
+                topic = topic
+            )
             
-            val heartRatePart = if (avgBpm > 0) {
-                "My average heart rate today is $avgBpm BPM (with a latest reading of $lastBpm BPM)."
-            } else {
-                "My heart rate data is not logged yet."
+            _uiState.update { 
+                it.copy(
+                    isAiLoading = false, 
+                    aiRecommendation = advice ?: "Error: Failed to fetch advice from AWS serverless backend."
+                ) 
             }
-
-            val sleepHours = sleepMinsTotal / 60
-            val sleepRemainingMins = sleepMinsTotal % 60
-            val sleepPart = if (sleepMinsTotal > 0) {
-                "Last night I slept for $sleepHours hours and $sleepRemainingMins minutes."
-            } else {
-                "My sleep data is not logged yet."
-            }
-
-            val prompt = when (topic) {
-                "steps" -> "My step count today is $steps. $heartRatePart. $sleepPart. Suggest a quick, personalized fitness recommendation based on these activity, heart rate, and sleep rest levels to keep me healthy."
-                "workout" -> "Design a quick 10-minute workout routine. Currently I have completed $steps steps today. $heartRatePart. $sleepPart. Tune the intensity of the workout depending on how much sleep/rest I got."
-                "nutrition" -> "Suggest a post-workout recovery snack or meal suggestion. Today I have completed $steps steps. $heartRatePart. $sleepPart."
-                else -> "Give me a quick general fitness motivation advice based on my step count of $steps steps, $heartRatePart, and $sleepPart today."
-            }
-            val advice = geminiService.generateFitnessAdvice(prompt)
-            _uiState.update { it.copy(isAiLoading = false, aiRecommendation = advice) }
         }
     }
 }

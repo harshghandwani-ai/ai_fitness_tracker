@@ -40,7 +40,7 @@ class MockUrlResponse:
                 {
                     "content": {
                         "parts": [
-                            {"text": "This is a simulated workout and rest recommendation based on your steps, heart rate, and sleep quality."}
+                            {"text": "This is a simulated workout and rest recommendation based on your steps, heart rate, sleep, calories, hydration, and weight stats."}
                         ]
                     }
                 }
@@ -67,11 +67,15 @@ sync_event = {
     "requestContext": {"http": {"method": "POST"}},
     "body": json.dumps({
         "userId": "harsh_test",
-        "date": "2026-06-30",
+        "date": "2026-07-02",
         "steps": 8450,
         "avgHeartRate": 72,
         "latestHeartRate": 68,
         "sleepMinutes": 480,
+        "caloriesBurned": 350,
+        "distanceKm": 5.4,
+        "hydrationMl": 1500.0,
+        "weightKg": 74.5,
         "timestamp": 1782349823
     })
 }
@@ -96,6 +100,10 @@ advice_event = {
         "avgHeartRate": 72,
         "latestHeartRate": 68,
         "sleepMinutes": 480,
+        "caloriesBurned": 350,
+        "distanceKm": 5.4,
+        "hydrationMl": 1500.0,
+        "weightKg": 74.5,
         "topic": "workout"
     })
 }

@@ -68,6 +68,10 @@ def handle_sync(event):
         'avgHeartRate': body.get('avgHeartRate', 0),
         'latestHeartRate': body.get('latestHeartRate', 0),
         'sleepMinutes': body.get('sleepMinutes', 0),
+        'caloriesBurned': body.get('caloriesBurned', 0),
+        'distanceKm': body.get('distanceKm', 0.0),
+        'hydrationMl': body.get('hydrationMl', 0.0),
+        'weightKg': body.get('weightKg', 0.0),
         'timestamp': int(body.get('timestamp', 0))
     }
     
@@ -92,6 +96,10 @@ def handle_generate_advice(event):
     avg_hr = body.get('avgHeartRate', 0)
     latest_hr = body.get('latestHeartRate', 0)
     sleep_mins = body.get('sleepMinutes', 0)
+    calories = body.get('caloriesBurned', 0)
+    distance = body.get('distanceKm', 0.0)
+    hydration = body.get('hydrationMl', 0.0)
+    weight = body.get('weightKg', 0.0)
     topic = body.get('topic', 'steps')
     
     api_key = get_gemini_api_key()
@@ -103,7 +111,9 @@ def handle_generate_advice(event):
     sleep_remainder = sleep_mins % 60
     
     prompt = f"You are a helpful personal AI Fitness Coach. Today the user has logged: " \
-             f"{steps} steps, average heart rate of {avg_hr} BPM (latest reading: {latest_hr} BPM), " \
+             f"{steps} steps ({distance:.2f} km traveled), active calories burned: {calories} kcal, " \
+             f"average heart rate of {avg_hr} BPM (latest reading: {latest_hr} BPM), " \
+             f"water intake of {hydration:.0f} ml, body weight: {weight:.1f} kg, " \
              f"and slept for {sleep_hours}h {sleep_remainder}m last night. "
              
     if topic == "steps":
